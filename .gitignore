@@ -1,0 +1,19 @@
+# IDE specific files
+.idea/
+.vscode/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Local envionment overrides (dotenv-flow)
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+
+# Local workspace (personal notes, drafts, temporary files - not for version control)
+/local/
+*.local.*
