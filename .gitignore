@@ -17,3 +17,12 @@ logs/
 # Local workspace (personal notes, drafts, temporary files - not for version control)
 /local/
 *.local.*
+
+# Claude Code local settings (machine-specific permissions)
+.claude/settings.local.json
+
+# Active staging area for soft-link workflow (machine-local, never pushed)
+/active/
+
+# Dependencies
+node_modules/
