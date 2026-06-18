@@ -3,7 +3,7 @@ import { lstatSync, readdirSync } from 'fs';
 import { type NamespaceComponent } from '@/configs/namespace';
 import { isFolderItem } from '@/helpers/claude';
 import { relPath } from '@/utils/fs';
-import { logger } from '@/utils/logger';
+import { logger } from '@/utils/shellLogger';
 
 /** Recursively collects all item paths (flat .md files and folder skills) under a directory. */
 export function collectItems(absDir: string, relDir: string, component: NamespaceComponent): string[] {
@@ -52,8 +52,7 @@ export function expandGlob(
   const isCategoryDir = isDir && !isFolderSkillDir;
 
   if ((flatExists || isFolderSkillDir) && isCategoryDir) {
-    logger.warn(`"${raw}" matches both a skill and a category folder — ${verb}ing the skill.`);
-    logger.dim(`  To ${verb} the folder contents: pnpm ${cmd} ${raw}/`);
+    logger.warn(`"${raw}" matches both a skill and a category folder — ${verb}ing the skill.`, `To ${verb} the folder contents: pnpm ${cmd} ${raw}/`);
     return [raw];
   }
 
