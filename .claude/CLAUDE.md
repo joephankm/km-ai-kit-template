@@ -104,7 +104,8 @@ ln -s $(pwd)/active/main/agents <project>/.claude/agents
 
 ## Conventions
 
-- Name files in `kebab-case`.
+- Skill and agent files use `kebab-case`.
+- Source code files (`src/`, `scripts/`) use `camelCase`, including folder names.
 - Keep each skill/agent focused on one job.
 - `description:` frontmatter is the single source of truth for what something does.
 - MCP configs go in `.claude/settings.json`; keep secrets out of it (use `settings.local.json` which is gitignored).
