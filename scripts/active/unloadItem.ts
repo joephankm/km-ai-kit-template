@@ -1,6 +1,6 @@
 import { basename, join } from 'path';
 import { lstatSync } from 'fs';
-import { DEFAULT_NAMESPACE, NAMESPACE_COMPONENTS } from '@/configs/namespace';
+import { COMPONENT_ENUM, DEFAULT_NAMESPACE } from '@/configs/namespace';
 import { isFolderItem } from '@/helpers/claude';
 import { collectItems, expandGlob } from '@/helpers/items';
 import { normalizeComponent } from '@/helpers/namespace';
@@ -8,35 +8,23 @@ import { ROOT, relPath, removePath } from '@/utils/fs';
 import { logger } from '@/utils/shellLogger';
 import { parseCommandArgv } from '@/utils/shellCommand';
 
-const cmd = process.env.npm_lifecycle_event ?? '<component>:unload';
-
-const { options, args } = parseCommandArgv({
-  command: `pnpm ${cmd}`,
+const { options, args, meta } = parseCommandArgv({
   args: {
-    component: { description: 'Namespace component (e.g. skills, agents)' },
-    items:     { description: 'Item name(s) or library path(s) to unload', placeholder: 'name|path', rest: true },
+    component: { type: 'enum', enum: COMPONENT_ENUM, description: 'Namespace component' },
+    items: { description: 'Item name(s) or library path(s) to unload', placeholder: 'name|path', rest: true },
   },
   options: {
     ns: { default: DEFAULT_NAMESPACE, description: 'Namespace to use', value: 'namespace' },
   },
   examples: [
-    { args: 'skills kmt-skill-flat',    desc: 'Remove by name from active' },
-    { args: 'skills <category>/',       desc: 'Expand library folder, remove all matches' },
+    { args: 'skills kmt-skill-flat', desc: 'Remove by name from active' },
+    { args: 'skills <category>/', desc: 'Expand library folder, remove all matches' },
     { args: 'skills <category>/<item>', desc: 'Expand library path, remove match' },
   ],
 });
 
-const { component: rawComponent, items: rawItems } = args;
-const ns = options.ns!;
-
-const component = normalizeComponent(rawComponent);
-if (!component) {
-  logger.error(`Invalid component: "${rawComponent}"`, `Allowed: ${NAMESPACE_COMPONENTS.join(', ')}`);
-  process.exit(1);
-}
-
-const resolvedComponent = component;
-const activeDir = join(ROOT, 'active', ns, resolvedComponent);
+const resolvedComponent = normalizeComponent(args.component)!;
+const activeDir = join(ROOT, 'active', options.ns!, resolvedComponent);
 
 if (!lstatSync(activeDir, { throwIfNoEntry: false })) {
   logger.warn(`Namespace component not initialized: ${relPath(activeDir)} — nothing to unload.`);
@@ -54,7 +42,7 @@ const toBaseName = (item: string) => basename(item.endsWith('.md') ? item.slice(
  */
 function resolveNames(raw: string): string[] {
   if (raw.includes('/')) {
-    return expandGlob(raw, resolvedComponent, ROOT, cmd, 'unload').map(toBaseName);
+    return expandGlob(raw, resolvedComponent, ROOT, meta.command, 'unload').map(toBaseName);
   }
 
   const fileStat = lstatSync(join(activeDir, `${raw}.md`), { throwIfNoEntry: false });
@@ -70,9 +58,9 @@ function resolveNames(raw: string): string[] {
   return [raw];
 }
 
-const names = rawItems.flatMap(resolveNames);
+const names = args.items.flatMap(resolveNames);
 
-logger.info(`Unloading ${names.length} item(s) from "${ns}/${resolvedComponent}"`);
+logger.info(`Unloading ${names.length} item(s) from "${options.ns!}/${resolvedComponent}"`);
 
 for (const name of names) {
   const filePath = join(activeDir, `${name}.md`);

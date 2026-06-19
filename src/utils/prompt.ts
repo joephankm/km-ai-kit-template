@@ -1,6 +1,8 @@
 import { createInterface } from 'readline/promises';
 
-/** Asks a yes/no question and returns true if the user answered yes. */
+/**
+ * Asks a yes/no question and returns true if the user answered yes.
+ */
 export async function confirm(question: string, defaultYes = false): Promise<boolean> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   const hint = defaultYes ? '(Y/n)' : '(y/n)';

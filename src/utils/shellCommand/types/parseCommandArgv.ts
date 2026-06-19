@@ -9,12 +9,13 @@ export type ParseArgsFields = {
 // A single option definition combining parseArgs runtime config and commandLog display config.
 // `type` defaults to 'string' when omitted.
 export type ArgvOptionDef = {
-  type?: 'string' | 'boolean';
+  type?: 'string' | 'boolean' | 'enum'; // 'enum' validates against the enum field; treated as 'string' at parse time
+  enum?: Record<string, string>; // accepted values → description; required when type is 'enum'
   multiple?: boolean;
   default?: string | boolean | string[] | boolean[];
   short?: string;
   description: string;
-  value?: string;      // explicit value placeholder; inferred from key when type is 'string'
+  value?: string; // explicit value placeholder; inferred from key when type is 'string' or 'enum'
   required?: boolean;
 };
 
@@ -25,11 +26,12 @@ export type ArgvOptionsDef = Record<string, ArgvOptionDef>;
 // The record key is used as the return property name and the default display placeholder.
 // Only the last entry in ArgsDef may set rest: true.
 export type ArgDef = {
-  type?: 'string' | 'number';   // default 'string'; drives return type and future validation
-  placeholder?: string;          // overrides key as display placeholder
+  type?: 'string' | 'number' | 'enum'; // default 'string'; 'enum' validates against the enum field
+  enum?: Record<string, string>; // accepted values → description; required when type is 'enum'
+  placeholder?: string; // overrides key as display placeholder
   description?: string;
   optional?: boolean;
-  rest?: boolean;                // collects all remaining positionals as an array
+  rest?: boolean; // collects all remaining positionals as an array
 };
 
 // A record of named positional argument definitions passed to parseCommandArgv
@@ -43,8 +45,8 @@ export type ParsedArgs<Arg extends ArgsDef> = {
   [K in keyof Arg]: Arg[K] extends { rest: true }
     ? ArgValueType<Arg[K]>[]
     : Arg[K] extends { optional: true }
-    ? ArgValueType<Arg[K]> | undefined
-    : ArgValueType<Arg[K]>;
+      ? ArgValueType<Arg[K]> | undefined
+      : ArgValueType<Arg[K]>;
 };
 
 // Typed options return — mirrors parseArgs conditional return logic.
@@ -53,28 +55,23 @@ export type ParsedOptions<Opt extends ArgvOptionsDef> = {
   [K in keyof Opt]?: Opt[K] extends { type: 'boolean'; multiple: true }
     ? boolean[]
     : Opt[K] extends { type: 'boolean' }
-    ? boolean
-    : Opt[K] extends { multiple: true }
-    ? string[]
-    : string;
+      ? boolean
+      : Opt[K] extends { multiple: true }
+        ? string[]
+        : string;
 };
 
 // A single example entry for parseCommandArgv.
 // String form is auto-prepended with the command name.
 // Object form with full: true uses the args string as-is without prepending.
-export type CommandExampleItem =
-  | string
-  | { args: string; desc?: string; full?: boolean };
+export type CommandExampleItem = string | { args: string; desc?: string; full?: boolean };
 
 // Full configuration object for parseCommandArgv
-export type ParseCommandArgvConfig<
-  Opt extends ArgvOptionsDef = ArgvOptionsDef,
-  Arg extends ArgsDef = ArgsDef,
-> = {
-  start?: number;      // argv slice position, default 2
-  command?: string;    // display name shown in usage, e.g. 'pnpm skills:load'
+export type ParseCommandArgvConfig<Opt extends ArgvOptionsDef = ArgvOptionsDef, Arg extends ArgsDef = ArgsDef> = {
+  start?: number; // argv slice position, default 2
+  command?: string; // display name shown in usage, e.g. 'pnpm skills:load'
   args?: Arg;
   options?: Opt;
   examples?: CommandExampleItem[];
-  minArgs?: number;    // override auto-calculated min (count of non-optional args)
+  minArgs?: number; // override auto-calculated min (count of non-optional args)
 };

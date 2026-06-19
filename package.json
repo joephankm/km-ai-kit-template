@@ -1,6 +1,6 @@
 {
   "name": "km-ai-kit",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "KM AI toolkit",
   "scripts": {
     "ns:init": "tsx scripts/active/initNamespace",
