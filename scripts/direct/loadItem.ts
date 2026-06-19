@@ -1,6 +1,6 @@
 import { basename, join } from 'path';
 import { cpSync, lstatSync, symlinkSync } from 'fs';
-import { NAMESPACE_COMPONENTS } from '@/configs/namespace';
+import { COMPONENT_ENUM } from '@/configs/namespace';
 import { isFolderItem, resolveClaudeTarget } from '@/helpers/claude';
 import { expandGlob } from '@/helpers/items';
 import { normalizeComponent } from '@/helpers/namespace';
@@ -8,17 +8,14 @@ import { ROOT, ensureDir, relPath, removePath } from '@/utils/fs';
 import { logger } from '@/utils/shellLogger';
 import { parseCommandArgv } from '@/utils/shellCommand';
 
-const cmd = process.env.npm_lifecycle_event ?? 'direct:<component>:load';
-
-const { options, args } = parseCommandArgv({
-  command: `pnpm ${cmd}`,
+const { options, args, meta } = parseCommandArgv({
   args: {
-    component: { description: 'Namespace component (e.g. skills, agents)' },
-    target:    { description: 'Target Claude directory (e.g. ~ or ~/myproject)' },
-    items:     { description: 'Item paths to load (category/item or category/)', placeholder: 'item-path', rest: true },
+    component: { type: 'enum', enum: COMPONENT_ENUM, description: 'Namespace component' },
+    target: { description: 'Target Claude directory (e.g. ~ or ~/myproject)' },
+    items: { description: 'Item paths to load (category/item or category/)', placeholder: 'item-path', rest: true },
   },
   options: {
-    copy:  { type: 'boolean', description: 'Copy instead of symlink' },
+    copy: { type: 'boolean', description: 'Copy instead of symlink' },
     force: { type: 'boolean', description: 'Overwrite existing items' },
   },
   examples: [
@@ -28,21 +25,11 @@ const { options, args } = parseCommandArgv({
   ],
 });
 
-const { component: rawComponent, target: rawTarget, items: rawItems } = args;
-const force = options.force ?? false;
-const copy = options.copy ?? false;
+const resolvedComponent = normalizeComponent(args.component)!;
+const targetDir = resolveClaudeTarget(args.target, resolvedComponent);
+const items = args.items.flatMap(raw => expandGlob(raw, resolvedComponent, ROOT, meta.command));
 
-const component = normalizeComponent(rawComponent);
-if (!component) {
-  logger.error(`Invalid component: "${rawComponent}"`, `Allowed: ${NAMESPACE_COMPONENTS.join(', ')}`);
-  process.exit(1);
-}
-
-const resolvedComponent = component;
-const targetDir = resolveClaudeTarget(rawTarget, resolvedComponent);
-const items = rawItems.flatMap(raw => expandGlob(raw, resolvedComponent, ROOT, cmd));
-
-logger.info(`Loading ${items.length} item(s) directly into "${targetDir}" (${copy ? 'copy' : 'symlink'})`);
+logger.info(`Loading ${items.length} item(s) directly into "${targetDir}" (${options.copy ? 'copy' : 'symlink'})`);
 
 ensureDir(targetDir);
 
@@ -68,14 +55,14 @@ for (const rawItemPath of items) {
   const target = join(targetDir, targetName);
   const targetStat = lstatSync(target, { throwIfNoEntry: false });
   if (targetStat) {
-    if (!force) {
+    if (!options.force) {
       logger.warn(`Already exists: ${targetName} (use --force to overwrite)`);
       continue;
     }
     removePath(target);
   }
 
-  if (copy) {
+  if (options.copy) {
     cpSync(source, target, { recursive: true });
     logger.success(`Copied: ${relPath(source)} → ${target}`);
   } else {

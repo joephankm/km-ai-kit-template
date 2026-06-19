@@ -1,7 +1,7 @@
 import { join, resolve } from 'path';
 import { lstatSync } from 'fs';
 import { homedir } from 'os';
-import { COMPONENT_FOLDER_ENTRY, type NamespaceComponent } from '@/configs/namespace';
+import { COMPONENTS, type NamespaceComponent } from '@/configs/namespace';
 
 /**
  * Resolves a user-provided target string to an absolute path for a Claude component.
@@ -20,12 +20,14 @@ export function resolveClaudeTarget(raw: string, component: string): string {
   return join(expanded, '.claude', component);
 }
 
-/** Returns true if the path is a folder-based item for the given component. */
+/**
+ * Returns true if the path is a folder-based item for the given component.
+ */
 export function isFolderItem(p: string, component: NamespaceComponent): boolean {
-  const entryFile = COMPONENT_FOLDER_ENTRY[component];
-  if (!entryFile) return false;
+  const { folderEntry } = COMPONENTS[component];
+  if (!folderEntry) return false;
   return (
     !!lstatSync(p, { throwIfNoEntry: false })?.isDirectory() &&
-    !!lstatSync(join(p, entryFile), { throwIfNoEntry: false })
+    !!lstatSync(join(p, folderEntry), { throwIfNoEntry: false })
   );
 }

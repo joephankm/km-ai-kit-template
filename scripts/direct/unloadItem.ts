@@ -1,6 +1,6 @@
 import { basename, join } from 'path';
 import { lstatSync } from 'fs';
-import { NAMESPACE_COMPONENTS } from '@/configs/namespace';
+import { COMPONENT_ENUM } from '@/configs/namespace';
 import { isFolderItem, resolveClaudeTarget } from '@/helpers/claude';
 import { collectItems, expandGlob } from '@/helpers/items';
 import { normalizeComponent } from '@/helpers/namespace';
@@ -8,32 +8,21 @@ import { ROOT, relPath, removePath } from '@/utils/fs';
 import { logger } from '@/utils/shellLogger';
 import { parseCommandArgv } from '@/utils/shellCommand';
 
-const cmd = process.env.npm_lifecycle_event ?? 'direct:<component>:unload';
-
-const { args } = parseCommandArgv({
-  command: `pnpm ${cmd}`,
+const { args, meta } = parseCommandArgv({
   args: {
-    component: { description: 'Namespace component (e.g. skills, agents)' },
-    target:    { description: 'Target Claude directory' },
-    items:     { description: 'Item name(s) or library path(s) to unload', placeholder: 'name|path', rest: true },
+    component: { type: 'enum', enum: COMPONENT_ENUM, description: 'Namespace component' },
+    target: { description: 'Target Claude directory' },
+    items: { description: 'Item name(s) or library path(s) to unload', placeholder: 'name|path', rest: true },
   },
   examples: [
-    { args: 'skills ~ kmt-skill-flat',           desc: 'Remove by name from target' },
-    { args: 'skills ~/myproject <category>/',    desc: 'Expand library folder, remove all matches' },
+    { args: 'skills ~ kmt-skill-flat', desc: 'Remove by name from target' },
+    { args: 'skills ~/myproject <category>/', desc: 'Expand library folder, remove all matches' },
     { args: 'skills ~/myproject <category>/<item>', desc: 'Expand library path, remove match' },
   ],
 });
 
-const { component: rawComponent, target: rawTarget, items: rawItems } = args;
-
-const component = normalizeComponent(rawComponent);
-if (!component) {
-  logger.error(`Invalid component: "${rawComponent}"`, `Allowed: ${NAMESPACE_COMPONENTS.join(', ')}`);
-  process.exit(1);
-}
-
-const resolvedComponent = component;
-const targetDir = resolveClaudeTarget(rawTarget, resolvedComponent);
+const resolvedComponent = normalizeComponent(args.component)!;
+const targetDir = resolveClaudeTarget(args.target, resolvedComponent);
 
 if (!lstatSync(targetDir, { throwIfNoEntry: false })) {
   logger.warn(`Target not found: ${targetDir} — nothing to unload.`);
@@ -51,7 +40,7 @@ const toBaseName = (item: string) => basename(item.endsWith('.md') ? item.slice(
  */
 function resolveNames(raw: string): string[] {
   if (raw.includes('/')) {
-    return expandGlob(raw, resolvedComponent, ROOT, cmd, 'unload').map(toBaseName);
+    return expandGlob(raw, resolvedComponent, ROOT, meta.command, 'unload').map(toBaseName);
   }
 
   const fileStat = lstatSync(join(targetDir, `${raw}.md`), { throwIfNoEntry: false });
@@ -67,7 +56,7 @@ function resolveNames(raw: string): string[] {
   return [raw];
 }
 
-const names = rawItems.flatMap(resolveNames);
+const names = args.items.flatMap(resolveNames);
 
 logger.info(`Unloading ${names.length} item(s) from "${targetDir}"`);
 

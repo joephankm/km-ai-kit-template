@@ -1,17 +1,26 @@
+import { singularOf } from '@/utils/inflection';
+
 /** The namespace used when no name is provided to a script. */
 export const DEFAULT_NAMESPACE = 'main';
 
-/** Valid components that can be created inside a namespace under `active/`. */
-export const NAMESPACE_COMPONENTS = ['skills', 'agents'] as const;
+export type ComponentConfig = {
+  description: string; // shown in CLI enum display
+  folderEntry?: string; // entry file for folder-based items (e.g. 'SKILL.md'); absent → file-only
+};
 
-export type NamespaceComponent = (typeof NAMESPACE_COMPONENTS)[number];
+export type NamespaceComponent = 'skills' | 'agents';
 
 /**
- * Entry file name for folder-based items, keyed by component.
- * Components listed here support both flat (.md) and folder formats.
- * Components not listed are file-only.
+ * Single source of truth for all namespace components.
+ * Typed as Record<NamespaceComponent, ComponentConfig> so indexing always yields ComponentConfig.
  */
-export const COMPONENT_FOLDER_ENTRY: Partial<Record<NamespaceComponent, string>> = {
-  skills: 'SKILL.md',
-  // agents: 'AGENT.md', // uncomment when agents support folder format
+export const COMPONENTS: Record<NamespaceComponent, ComponentConfig> = {
+  skills: { description: 'Reusable AI skills', folderEntry: 'SKILL.md' },
+  agents: { description: 'Reusable subagents' },
 };
+
+/** Enum map for use with parseCommandArgv — includes both plural and singular aliases. */
+export const COMPONENT_ENUM: Record<string, string> = Object.fromEntries([
+  ...Object.entries(COMPONENTS).map(([k, v]) => [k, v.description]),
+  ...Object.entries(COMPONENTS).map(([k]) => [singularOf(k), `Alias for '${k}'`]),
+]);

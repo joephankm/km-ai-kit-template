@@ -1,7 +1,7 @@
 import { basename, join } from 'path';
 import { cpSync, lstatSync, symlinkSync } from 'fs';
 import { spawnSync } from 'child_process';
-import { DEFAULT_NAMESPACE, NAMESPACE_COMPONENTS } from '@/configs/namespace';
+import { COMPONENT_ENUM, DEFAULT_NAMESPACE } from '@/configs/namespace';
 import { isFolderItem } from '@/helpers/claude';
 import { expandGlob } from '@/helpers/items';
 import { normalizeComponent } from '@/helpers/namespace';
@@ -10,48 +10,39 @@ import { logger } from '@/utils/shellLogger';
 import { parseCommandArgv } from '@/utils/shellCommand';
 import { confirm } from '@/utils/prompt';
 
-const cmd = process.env.npm_lifecycle_event ?? '<component>:load';
-
-const { options, args, log } = parseCommandArgv({
-  command: `pnpm ${cmd}`,
+const { options, args, meta } = parseCommandArgv({
   args: {
-    component: { description: 'Namespace component (e.g. skills, agents)' },
+    component: { type: 'enum', enum: COMPONENT_ENUM, description: 'Namespace component' },
     items: { description: 'Item paths to load (category/item or category/)', rest: true },
   },
   options: {
-    ns: { type: 'string', default: DEFAULT_NAMESPACE, description: 'Namespace to use' },
+    ns: { default: DEFAULT_NAMESPACE, description: 'Namespace to use' },
     copy: { type: 'boolean', description: 'Copy instead of symlink' },
     force: { type: 'boolean', description: 'Overwrite existing items' },
   },
   examples: ['skills <category>/<item>', 'skills <category>/<item1> <category>/<item2>', 'skills <category>/'],
 });
 
-const { component: rawComponent, items: rawItems } = args;
-const ns = options.ns!;
-const force = options.force!;
-const copy = options.copy!;
+const resolvedComponent = normalizeComponent(args.component)!;
 
-const component = normalizeComponent(rawComponent);
-if (!component) {
-  logger.error(`Invalid component: "${rawComponent}"`, `Allowed: ${NAMESPACE_COMPONENTS.join(', ')}`);
-  process.exit(1);
-}
-
-const resolvedComponent = component;
-
-async function main() {
-  const targetDir = join(ROOT, 'active', ns, resolvedComponent);
+async function execute() {
+  const targetDir = join(ROOT, 'active', options.ns!, resolvedComponent);
   if (!lstatSync(targetDir, { throwIfNoEntry: false })) {
     logger.warn(`Namespace component not initialized: ${relPath(targetDir)}`);
-    const yes = await confirm(`Run "pnpm ns:init --ns ${ns} ${resolvedComponent}" now?`, true);
+    const initCmd = meta.command.replace(/\w+$/, 'initNamespace');
+    const yes = await confirm(`Run "${initCmd} --ns ${options.ns!} ${resolvedComponent}" now?`, true);
     if (!yes) process.exit(0);
-    const result = spawnSync('pnpm', ['ns:init', '--ns', ns, resolvedComponent], { stdio: 'inherit' });
+    const result = spawnSync(meta.packageManager ?? 'pnpm', ['ns:init', '--ns', options.ns!, resolvedComponent], {
+      stdio: 'inherit',
+    });
     if (result.status !== 0) process.exit(result.status ?? 1);
   }
 
-  const items = rawItems.flatMap(raw => expandGlob(raw, resolvedComponent, ROOT, cmd));
+  const items = args.items.flatMap(raw => expandGlob(raw, resolvedComponent, ROOT, meta.command));
 
-  logger.info(`Loading ${items.length} item(s) into "${ns}/${resolvedComponent}" (${copy ? 'copy' : 'symlink'})`);
+  logger.info(
+    `Loading ${items.length} item(s) into "${options.ns!}/${resolvedComponent}" (${options.copy ? 'copy' : 'symlink'})`
+  );
 
   for (const rawItemPath of items) {
     const itemBase = rawItemPath.endsWith('.md') ? rawItemPath.slice(0, -3) : rawItemPath;
@@ -75,7 +66,7 @@ async function main() {
     const target = join(targetDir, targetName);
     const targetStat = lstatSync(target, { throwIfNoEntry: false });
     if (targetStat) {
-      if (!force) {
+      if (!options.force) {
         logger.warn(`Already loaded: ${targetName} (use --force to overwrite)`);
         continue;
       }
@@ -83,7 +74,7 @@ async function main() {
     }
 
     ensureDir(targetDir);
-    if (copy) {
+    if (options.copy) {
       cpSync(source, target, { recursive: true });
       logger.success(`Copied: ${relPath(source)} → ${relPath(target)}`);
     } else {
@@ -93,7 +84,7 @@ async function main() {
   }
 }
 
-main().catch(e => {
+execute().catch(e => {
   logger.error(String(e));
   process.exit(1);
 });

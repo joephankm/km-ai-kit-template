@@ -1,6 +1,6 @@
-const c = { reset: '\x1b[0m', gray: '\x1b[90m' };
+import { theme as t } from './theme';
 
-const g = (s: string) => `${c.gray}${s}${c.reset}`;
+const g = (s: string) => `${t.dim}${s}${t.reset}`;
 const INDENT = '  ';
 
 // --- Types ---
@@ -11,13 +11,15 @@ export type ArgItem = {
   placeholder: string; // display name without <>, e.g. 'item-path...' → <item-path...>
   description?: string;
   optional?: boolean;
+  enum?: Record<string, string>; // accepted values → description; shown in full help
 };
 
 export type OptionDef = {
-  type?: 'string' | 'boolean'; // mirrors ParseArgsOptionDescriptor; drives value placeholder inference
+  type?: 'string' | 'boolean' | 'enum'; // drives value placeholder inference; 'enum' shows accepted values
+  enum?: Record<string, string>; // accepted values → description; shown in full help
   description: string;
   short?: string;
-  value?: string; // explicit placeholder text; if absent and type === 'string', key name is used
+  value?: string; // explicit placeholder text; overrides the inferred placeholder
   required?: boolean; // default false → wrapped in []
 };
 
@@ -47,13 +49,28 @@ export type UsageItem =
 
 function optionSig(name: string, def: OptionDef): string {
   const base = def.short ? `-${def.short}, --${name}` : `--${name}`;
-  const placeholder = def.value ?? (def.type === 'string' ? name : undefined);
+  let placeholder: string | undefined;
+  if (def.value) {
+    placeholder = def.value;
+  } else if (def.type === 'enum' && def.enum) {
+    placeholder = Object.keys(def.enum).join('|');
+  } else if (def.type === 'string') {
+    placeholder = name;
+  }
   const sig = placeholder ? `${base} <${placeholder}>` : base;
   return def.required ? sig : `[${sig}]`;
 }
 
 function isGrouped(input: OptionsInput): input is OptionsGroup {
   return 'options' in input;
+}
+
+function renderEnumValues(enumDef: Record<string, string>): void {
+  const entries = Object.entries(enumDef);
+  const col = Math.max(...entries.map(([v]) => v.length)) + 4;
+  for (const [val, desc] of entries) {
+    console.log(`${INDENT}${INDENT}${val}${' '.repeat(col - val.length)}${g(desc)}`);
+  }
 }
 
 function renderOptionsMap(map: OptionsMap): void {
@@ -64,14 +81,27 @@ function renderOptionsMap(map: OptionsMap): void {
   const col = Math.max(...sigs.map(s => s.length)) + 4;
 
   sigs.forEach((sig, i) => {
-    const desc = entries[i][1].description;
-    console.log(`${INDENT}${sig}${' '.repeat(col - sig.length)}${g(desc)}`);
+    const def = entries[i][1];
+    console.log(`${INDENT}${sig}${' '.repeat(col - sig.length)}${g(def.description)}`);
+    if (def.type === 'enum' && def.enum) renderEnumValues(def.enum);
   });
 }
 
 // --- Export ---
 
 export default {
+  args(...items: ArgItem[]): void {
+    console.log('Arguments:');
+    console.log();
+    const placeholders = items.map(item => (item.optional ? `[<${item.placeholder}>]` : `<${item.placeholder}>`));
+    const col = Math.max(...placeholders.map(p => p.length)) + 4;
+    items.forEach((item, i) => {
+      const ph = placeholders[i];
+      console.log(`${INDENT}${ph}${' '.repeat(col - ph.length)}${item.description ? g(item.description) : ''}`);
+      if (item.enum) renderEnumValues(item.enum);
+    });
+  },
+
   example(...examples: ExampleItem[]): void {
     console.log('Examples:');
     examples.forEach((item, i) => {
