@@ -19,8 +19,14 @@ const { options, args, meta } = parseCommandArgv({
     ns: { default: DEFAULT_NAMESPACE, description: 'Namespace to use' },
     copy: { type: 'boolean', description: 'Copy instead of symlink' },
     force: { type: 'boolean', description: 'Overwrite existing items' },
+    rename: { description: 'Load under a different name (single item only)', value: 'new-name' },
   },
-  examples: ['skills <category>/<item>', 'skills <category>/<item1> <category>/<item2>', 'skills <category>/'],
+  examples: [
+    'skills <category>/<item>',
+    'skills <category>/<item1> <category>/<item2>',
+    'skills <category>/',
+    { args: 'skills <category>/<item> --rename my-item', desc: 'Load under a different name' },
+  ],
 });
 
 const resolvedComponent = normalizeComponent(args.component)!;
@@ -40,6 +46,11 @@ async function execute() {
 
   const items = args.items.flatMap(raw => expandGlob(raw, resolvedComponent, ROOT, meta.command));
 
+  if (options.rename && items.length !== 1) {
+    logger.error(`--rename requires exactly one item, got ${items.length}`);
+    process.exit(1);
+  }
+
   logger.info(
     `Loading ${items.length} item(s) into "${options.ns!}/${resolvedComponent}" (${options.copy ? 'copy' : 'symlink'})`
   );
@@ -54,10 +65,10 @@ async function execute() {
 
     if (isFolderItem(folderSource, resolvedComponent)) {
       source = folderSource;
-      targetName = basename(itemBase);
+      targetName = options.rename ?? basename(itemBase);
     } else if (lstatSync(fileSource, { throwIfNoEntry: false })) {
       source = fileSource;
-      targetName = `${basename(itemBase)}.md`;
+      targetName = `${options.rename ?? basename(itemBase)}.md`;
     } else {
       logger.error(`Not found: ${relPath(fileSource)}`);
       continue;
